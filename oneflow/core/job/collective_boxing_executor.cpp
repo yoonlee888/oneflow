@@ -130,11 +130,15 @@ class NcclCollectiveBoxingExecutorBackend : public CollectiveBoxingExecutorBacke
   std::shared_ptr<ThreadPool> callback_executor_pool_;
 
   int64_t current_stream_id_ = 0;
+  bool debug_nccl_copy_only_;
+  bool debug_nccl_copy_only_sync_;
 };
 
 NcclCollectiveBoxingExecutorBackend::NcclCollectiveBoxingExecutorBackend()
     : collective_boxing_conf_(Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf()),
-      shutdown_(false) {
+      shutdown_(false),
+      debug_nccl_copy_only_(false),
+      debug_nccl_copy_only_sync_(false) {
   OF_CUDA_CHECK(cudaGetDeviceCount(&num_devices_));
   callback_executor_pool_.reset(new ThreadPool(num_devices_));
   CHECK_GT(collective_boxing_conf_.nccl_num_streams(), 0);
@@ -172,6 +176,10 @@ NcclCollectiveBoxingExecutorBackend::NcclCollectiveBoxingExecutorBackend()
       }
     }
   });
+  debug_nccl_copy_only_ =
+      ParseBooleanFromEnv("ONEFLOW_COLLECTIVE_BOXING_DEBUG_NCCL_COPY_ONLY", false);
+  debug_nccl_copy_only_sync_ =
+      ParseBooleanFromEnv("ONEFLOW_COLLECTIVE_BOXING_DEBUG_NCCL_COPY_ONLY_SYNC", false);
 }
 
 NcclCollectiveBoxingExecutorBackend::~NcclCollectiveBoxingExecutorBackend() {
@@ -338,10 +346,17 @@ void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(
     for (auto& device_id7comm : device_id2comm) {
       OF_CUDA_CHECK(cudaSetDevice(device_id7comm.first));
       auto& device_ctx = device_id2device_ctx.at(device_id7comm.first);
-      OF_NCCL_CHECK(ncclAllReduce(device_ctx->fusion_buffer, device_ctx->fusion_buffer, elem_cnt,
-                                  GetNcclDataType(group.front()->op_desc().data_type()),
-                                  GetNcclReduceOp(group.front()->op_desc().reduce_method()),
-                                  device_id7comm.second, device_ctx->stream));
+      if (debug_nccl_copy_only_sync_) {
+        OF_NCCL_CHECK(ncclAllReduce(device_ctx->fusion_buffer, device_ctx->fusion_buffer, 1,
+                                    GetNcclDataType(group.front()->op_desc().data_type()),
+                                    GetNcclReduceOp(group.front()->op_desc().reduce_method()),
+                                    device_id7comm.second, device_ctx->stream));
+      } else {
+        OF_NCCL_CHECK(ncclAllReduce(device_ctx->fusion_buffer, device_ctx->fusion_buffer, elem_cnt,
+                                    GetNcclDataType(group.front()->op_desc().data_type()),
+                                    GetNcclReduceOp(group.front()->op_desc().reduce_method()),
+                                    device_id7comm.second, device_ctx->stream));
+      }
     }
     OF_NCCL_CHECK(ncclGroupEnd());
     for (auto& device_id7copy_out_params : device_id2copy_out_params) {
@@ -373,9 +388,20 @@ void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(
         device_id2callbacks[device_id].reserve(group_size);
         device_id2callbacks[device_id].push_back(request_info.callback);
         if (op_type == OpType::kOpTypeAllReduce) {
-          OF_NCCL_CHECK(ncclAllReduce(send_buff, recv_buff, elem_cnt, nccl_data_type,
-                                      GetNcclReduceOp(op_desc.reduce_method()), comm,
-                                      device_ctx->stream));
+          if (debug_nccl_copy_only_ || debug_nccl_copy_only_sync_) {
+            if (debug_nccl_copy_only_sync_) {
+              OF_NCCL_CHECK(ncclAllReduce(send_buff, recv_buff, 1, nccl_data_type,
+                                          GetNcclReduceOp(op_desc.reduce_method()), comm,
+                                          device_ctx->stream));
+            }
+            OF_CUDA_CHECK(cudaMemcpyAsync(recv_buff, send_buff,
+                                          elem_cnt * GetSizeOfDataType(op_desc.data_type()),
+                                          cudaMemcpyDefault, device_ctx->stream));
+          } else {
+            OF_NCCL_CHECK(ncclAllReduce(send_buff, recv_buff, elem_cnt, nccl_data_type,
+                                        GetNcclReduceOp(op_desc.reduce_method()), comm,
+                                        device_ctx->stream));
+          }
         } else if (op_type == OpType::kOpTypeAllGather) {
           CHECK_EQ(elem_cnt % num_ranks, 0);
           OF_NCCL_CHECK(ncclAllGather(send_buff, recv_buff, elem_cnt / num_ranks, nccl_data_type,
