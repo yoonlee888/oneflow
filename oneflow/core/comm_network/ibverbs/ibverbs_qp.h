@@ -55,7 +55,7 @@ class IBVerbsQP final {
  public:
   OF_DISALLOW_COPY_AND_MOVE(IBVerbsQP);
   IBVerbsQP() = delete;
-  IBVerbsQP(ibv_context*, ibv_pd*, ibv_cq* send_cq, ibv_cq* recv_cq);
+  IBVerbsQP(ibv_context*, ibv_pd*, uint8_t port_num, ibv_cq* send_cq, ibv_cq* recv_cq);
   ~IBVerbsQP();
 
   uint32_t qp_num() const { return qp_->qp_num; }
@@ -78,6 +78,7 @@ class IBVerbsQP final {
 
   ibv_context* ctx_;
   ibv_pd* pd_;
+  uint8_t port_num_;
   ibv_qp* qp_;
   std::vector<ActorMsgMR*> recv_msg_buf_;
 
