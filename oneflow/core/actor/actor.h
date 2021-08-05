@@ -147,7 +147,6 @@ class Actor {
   int64_t HandleRegstToConsumer(Regst* regst, std::function<bool(int64_t)> IsAllowedActor);
 
  protected:
-  int64_t GetGlobalWorkStreamId() const;
   virtual bool NeedCollectActEvent() const {
     return Global<RuntimeCtx>::Get()->NeedCollectActEvent();
   }
@@ -219,6 +218,7 @@ class Actor {
 
   const JobDesc* job_desc_;
   int64_t actor_id_;
+  int64_t global_work_stream_id_;
   int64_t act_id_;
   std::unique_ptr<ParallelContext> parallel_ctx_;
   std::vector<ExecKernel> exec_kernel_vec_;

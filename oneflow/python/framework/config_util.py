@@ -253,23 +253,6 @@ def use_rdma(val=True):
     sess.config_proto.resource.use_rdma = val
 
 
-@oneflow_export("config.thread_enable_local_message_queue")
-def api_thread_enable_local_message_queue(val: bool) -> None:
-    """Whether or not enable thread using local  message queue.
-
-    Args:
-        val (bool):  True or False
-    """
-    return enable_if.unique([thread_enable_local_message_queue, do_nothing])(val)
-
-
-@enable_if.condition(hob.in_normal_mode & ~hob.session_initialized)
-def thread_enable_local_message_queue(val):
-    sess = session_ctx.GetDefaultSession()
-    assert type(val) is bool
-    sess.config_proto.resource.thread_enable_local_message_queue = val
-
-
 @oneflow_export("config.enable_debug_mode")
 def api_enable_debug_mode(val: bool) -> None:
     r"""Whether use debug mode or not.
