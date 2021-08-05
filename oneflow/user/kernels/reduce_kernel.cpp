@@ -16,13 +16,14 @@ limitations under the License.
 #include "oneflow/core/framework/framework.h"
 #include "oneflow/core/ndarray/ndarray_util.h"
 #include "oneflow/core/ndarray/xpu_var_ndarray.h"
+#include "oneflow/core/kernel/cuda_graph_support.h"
 
 namespace oneflow {
 
 namespace {
 
 template<template<typename> class BinaryFunc, DeviceType device_type, typename T>
-class ReduceKernel final : public user_op::OpKernel {
+class ReduceKernel final : public user_op::OpKernel, public user_op::CudaGraphSupport {
  public:
   ReduceKernel() = default;
   ~ReduceKernel() = default;
@@ -100,7 +101,7 @@ void GetReduceSumLayout(const std::vector<int32_t>& axis, const ShapeView& in_sh
 
 }  // namespace
 
-class ReduceSumHalfKernel final : public user_op::OpKernel {
+class ReduceSumHalfKernel final : public user_op::OpKernel, public user_op::CudaGraphSupport {
  public:
   explicit ReduceSumHalfKernel(user_op::KernelCreateContext* ctx) {
     axis_ = RegularAxis(ctx->Attr<std::vector<int32_t>>("axis"));
