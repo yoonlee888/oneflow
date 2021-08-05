@@ -538,7 +538,8 @@ REGISTER_LAYER_NORM_GRAD_GPU_KERNEL(double, double)
 REGISTER_LAYER_NORM_GRAD_GPU_KERNEL(float16, float)
 
 template<typename T>
-class LayerNormParamGradGpuKernel final : public user_op::OpKernel, public user_op::CudaGraphSupport {
+class LayerNormParamGradGpuKernel final : public user_op::OpKernel,
+                                          public user_op::CudaGraphSupport {
  public:
   LayerNormParamGradGpuKernel() = default;
   ~LayerNormParamGradGpuKernel() = default;
@@ -633,7 +634,8 @@ class LayerNormParamGradGpuKernel final : public user_op::OpKernel, public user_
 REGISTER_LAYER_NORM_PARAM_GRAD_GPU_KERNEL(float)
 REGISTER_LAYER_NORM_PARAM_GRAD_GPU_KERNEL(double)
 
-class LayerNormParamGradGpuHalfKernel final : public user_op::OpKernel, public user_op::CudaGraphSupport {
+class LayerNormParamGradGpuHalfKernel final : public user_op::OpKernel,
+                                              public user_op::CudaGraphSupport {
  public:
   LayerNormParamGradGpuHalfKernel() = default;
   ~LayerNormParamGradGpuHalfKernel() = default;

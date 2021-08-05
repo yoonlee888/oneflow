@@ -113,7 +113,7 @@ class MathUnaryElementwiseGpuHalfKernel final : public user_op::OpKernel,
     const half* x = reinterpret_cast<const half*>(tensor_x->dptr<float16>());
     half* y = reinterpret_cast<half*>(tensor_y->mut_dptr<float16>());
     int64_t n = tensor_x->shape().elem_cnt();
-    CHECK_LE(n, GetMaxVal<int32_t>() / 2);    
+    CHECK_LE(n, GetMaxVal<int32_t>() / 2);
     MathUnaryElementwiseForwardGpu<UnaryFunctor, half>
         <<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->device_ctx()->cuda_stream()>>>(
             n, x, y);

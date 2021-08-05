@@ -43,7 +43,8 @@ void ComputeProb(DeviceCtx* ctx, const int64_t row, const int64_t col, const flo
 }  // namespace
 
 template<typename T, typename K>
-class SparseSoftmaxCrossEntropyKernel final : public user_op::OpKernel, public user_op::CudaGraphSupport {
+class SparseSoftmaxCrossEntropyKernel final : public user_op::OpKernel,
+                                              public user_op::CudaGraphSupport {
  public:
   SparseSoftmaxCrossEntropyKernel() = default;
   ~SparseSoftmaxCrossEntropyKernel() override = default;

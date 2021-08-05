@@ -368,7 +368,7 @@ class NcclLogical2DSameDim1KernelCommState final : public user_op::OpKernelState
       }
       comm_ = CHECK_NOTNULL(Global<EagerNcclCommMgr>::Get())->GetCommForDevice(device_set);
       Global<CtrlClient>::Get()->Barrier("NCCL-LOGICAL-2D-SAME-DIM1-KERNELS-BARRIER-" + op_name_,
-                                   parallel_desc_.parallel_num());
+                                         parallel_desc_.parallel_num());
       is_init_ = true;
     }
     return comm_;

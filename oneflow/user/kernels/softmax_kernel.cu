@@ -20,7 +20,7 @@ limitations under the License.
 namespace oneflow {
 
 template<typename T>
-class SoftmaxKernel final : public user_op::OpKernel, public user_op::CudaGraphSupport  {
+class SoftmaxKernel final : public user_op::OpKernel, public user_op::CudaGraphSupport {
  public:
   SoftmaxKernel() = default;
   ~SoftmaxKernel() override = default;
@@ -51,7 +51,7 @@ REGISTER_SOFTMAX_GPU_KERNEL(double)
 #undef REGISTER_SOFTMAX_GPU_KERNEL
 
 template<typename T>
-class SoftmaxGradKernel final : public user_op::OpKernel, public user_op::CudaGraphSupport  {
+class SoftmaxGradKernel final : public user_op::OpKernel, public user_op::CudaGraphSupport {
  public:
   SoftmaxGradKernel() = default;
   ~SoftmaxGradKernel() override = default;

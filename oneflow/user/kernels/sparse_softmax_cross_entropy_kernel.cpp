@@ -42,7 +42,8 @@ class SparseSoftmaxCrossEntropyOpKernelState final : public user_op::OpKernelSta
 }  // namespace
 
 template<DeviceType device_type, typename T, typename K>
-class SparseSoftmaxCrossEntropyKernel final : public user_op::OpKernel, public user_op::CudaGraphSupport {
+class SparseSoftmaxCrossEntropyKernel final : public user_op::OpKernel,
+                                              public user_op::CudaGraphSupport {
  public:
   SparseSoftmaxCrossEntropyKernel() = default;
   ~SparseSoftmaxCrossEntropyKernel() = default;
@@ -117,7 +118,8 @@ OF_PP_SEQ_PRODUCT_FOR_EACH_TUPLE(REGISTER_SPARSE_SOFTMAX_CROSS_ENTROPY_KERNEL,
 #endif
 
 template<DeviceType device_type, typename T, typename K>
-class SparseSoftmaxCrossEntropyGradKernel final : public user_op::OpKernel, public user_op::CudaGraphSupport {
+class SparseSoftmaxCrossEntropyGradKernel final : public user_op::OpKernel,
+                                                  public user_op::CudaGraphSupport {
  public:
   SparseSoftmaxCrossEntropyGradKernel() = default;
   ~SparseSoftmaxCrossEntropyGradKernel() = default;
