@@ -601,8 +601,6 @@ void UserKernel::InitUserKernel(DeviceCtx* device_ctx) {
     KernelCreateContext create_ctx(kernel_conf());
     kernel_.reset(kernel_reg_val->create_fn(&create_ctx));
   }
-}
-
 #ifdef WITH_USER_KERNEL_CUDA_GRAPH
 if (ParseBooleanFromEnv("ONEFLOW_KERNEL_ENABLE_CUDA_GRAPH", false)) {
   UserKernelInitContext init_ctx(device_ctx, kernel_conf(), job_desc());
@@ -614,6 +612,8 @@ if (ParseBooleanFromEnv("ONEFLOW_KERNEL_ENABLE_CUDA_GRAPH", false)) {
   }
 }
 #endif  // WITH_USER_KERNEL_CUDA_GRAPH
+}
+
 
 std::shared_ptr<user_op::OpKernelState> UserKernel::CreateOpKernelState(DeviceCtx* device_ctx) {
   UserKernelInitContext init_ctx(device_ctx, kernel_conf(), job_desc());

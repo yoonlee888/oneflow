@@ -23,7 +23,6 @@ namespace oneflow {
 
 struct RegstStatus {
   int64_t regst_desc_id;
-  int64_t piece_id;
   int64_t act_id;
 };
 
@@ -34,7 +33,6 @@ class Regst final {
 
   // Getters
   const RegstStatus& status() const { return status_; }
-  int64_t piece_id() const { return status_.piece_id; }
   int64_t act_id() const { return status_.act_id; }
   int64_t regst_desc_id() const {
     CHECK_NE(status_.regst_desc_id, -1);
@@ -52,7 +50,6 @@ class Regst final {
   void* comm_net_token() const { return comm_net_token_; }
 
   // Setters
-  void set_piece_id(int64_t val) { status_.piece_id = val; }
   void set_act_id(int64_t val) { status_.act_id = val; }
 
  private:

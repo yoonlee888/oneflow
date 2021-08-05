@@ -51,12 +51,12 @@ class ActorMsg final {
   ActorCmd actor_cmd() const;
   Regst* regst() const;
   int64_t regst_desc_id() const;
-  int64_t piece_id() const;
   int64_t act_id() const;
   void* comm_net_token() const;
   bool has_sole_empty_blob() const;
   int64_t eord_regst_desc_id() const;
-
+  int64_t comm_net_sequence_number() const;
+  void set_comm_net_sequence_number(int64_t sequence_number);
   // Serialize
   template<typename StreamT>
   void Serialize(StreamT& out_stream) const {
@@ -71,6 +71,7 @@ class ActorMsg final {
   struct RegstWrapper {
     Regst* regst;
     void* comm_net_token;
+    int64_t comm_net_sequence_number;
     RegstStatus regst_status;
     bool has_sole_empty_blob;
   };
