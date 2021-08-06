@@ -234,7 +234,6 @@ void Actor::IncreaseReadingCnt4ProducedRegst(Regst* regst, int64_t val) {
   produced_regst2reading_cnt_.at(regst) += val;
 }
 
-
 void Actor::InitDeviceCtx(const ThreadCtx& thread_ctx) {
   DeviceCtx* dev_ctx = NewObj<int, DeviceCtx, const ThreadCtx&>(GetDeviceType(), thread_ctx);
   device_ctx_.reset(dev_ctx);
@@ -549,7 +548,6 @@ void Actor::HandleProducedNaiveDataRegstToConsumer() {
   naive_produced_rs_.PopFrontRegsts(tmp_regst_desc_id_vec_);
 }
 
-
 void Actor::HandleProducedInplaceDataRegstToConsumer() {
   tmp_regst_desc_id_vec_.clear();
   inplace_produced_rs_.ForEachFrontRegst([&](Regst* regst) {
@@ -641,7 +639,6 @@ void Actor::EnqueueAsyncMsg(const ActorMsg& msg) {
     async_msg_queue_.push_back(msg);
   }
 }
-
 
 Regst* Actor::GetNaiveOrInplaceCurReadable(int64_t regst_desc_id) const {
   Regst* regst = naive_consumed_rs_.Front(regst_desc_id);

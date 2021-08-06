@@ -23,10 +23,11 @@ void SourceTickComputeActor::VirtualCompActorInit(const TaskProto& task_proto) {
   OF_SET_MSG_HANDLER(&SourceTickComputeActor::HandlerWaitToStart);
 }
 
-void SourceTickComputeActor::Act() { Regst* regst = GetNaiveCurWriteable("out"); }
+void SourceTickComputeActor::Act() {}
 
 bool SourceTickComputeActor::IsCustomizedReadReady() const {
-  return piece_id_ < Global<RuntimeCtx>::Get()->total_piece_num();
+  // NOTE(chengcheng): SourceTickActor CANNOT be used and need delete in the future
+  return true;
 }
 
 int SourceTickComputeActor::HandlerWaitToStart(const ActorMsg& msg) {

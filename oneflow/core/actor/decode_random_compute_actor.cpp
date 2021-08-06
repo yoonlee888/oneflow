@@ -26,10 +26,7 @@ void DecodeRandomActor::Act() { AsyncLaunchKernel(GenDefaultKernelCtx()); }
 
 void DecodeRandomActor::VirtualAsyncSendNaiveProducedRegstMsgToConsumer() {
   Regst* in_regst = GetNaiveCurReadable("in");
-  HandleProducedNaiveDataRegstToConsumer([&](Regst* out_regst) {
-    out_regst->set_piece_id(in_regst->piece_id());
-    return true;
-  });
+  HandleProducedNaiveDataRegstToConsumer();
 }
 
 REGISTER_ACTOR(kDecodeRandom, DecodeRandomActor);

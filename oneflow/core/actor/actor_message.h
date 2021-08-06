@@ -55,6 +55,7 @@ class ActorMsg final {
   void* comm_net_token() const;
   bool has_sole_empty_blob() const;
   int64_t eord_regst_desc_id() const;
+  bool IsDataRegstMsgToConsumer() const;
   int64_t comm_net_sequence_number() const;
   void set_comm_net_sequence_number(int64_t sequence_number);
   // Serialize
@@ -74,6 +75,7 @@ class ActorMsg final {
     int64_t comm_net_sequence_number;
     RegstStatus regst_status;
     bool has_sole_empty_blob;
+    bool is_data_regst_to_consumer;
   };
 
   int64_t src_actor_id_;
