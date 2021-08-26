@@ -33,13 +33,6 @@ __device__ __forceinline__ int32_t FirstLane(int pred) {
 }
 
 template<typename T>
-__device__ __forceinline__ void SwapElem(T& a, T& b) {
-  const T val = a;
-  a = b;
-  b = val;
-}
-
-template<typename T>
 class BatchIO final {
  public:
   __device__ __forceinline__ explicit BatchIO(int32_t lane, int32_t size, const T* ptr)
@@ -101,16 +94,9 @@ class LFUQueue final {
   __device__ __forceinline__ void Push(int32_t val) {
     Load();
     const int32_t prev_lane = FirstLane(val_ == val);
-    /* LRU
-    if (old_idx == -1 || lane_ >= old_idx) { val_ = __shfl_down_sync(__activemask(), val_, 1); }
+    // LRU
+    if (prev_lane == -1 || lane_ >= prev_lane) { val_ = __shfl_down_sync(__activemask(), val_, 1); }
     if (lane_ == 31) { val_ = val; }
-     */
-    // LFU
-    if (prev_lane == 31) { return; }
-    const int32_t next_lane = prev_lane + 1;
-    const int32_t next_val = __shfl_sync(kFullMask, val_, next_lane);
-    if (lane_ == prev_lane) { val_ = next_val; }
-    if (lane_ == next_lane) { val_ = val; }
     status_ = Status::kModified;
   }
 
@@ -124,33 +110,6 @@ class LFUQueue final {
   int32_t val_;
   int8_t* ptr_;
   Status status_;
-};
-
-class LRUQueue final {
- public:
-  __device__ __forceinline__ LRUQueue(int32_t lane, uint32_t* buffer, uint32_t* tail)
-      : lane_(lane), buffer_ptr_(buffer), tail_ptr_(tail) {}
-
-  __device__ __forceinline__ ~LRUQueue() {}
-
-  __device__ __forceinline__ void Push(uint32_t val) {
-    if (lane_ == *tail_ptr_) {
-      buffer_ptr_[lane_] = val;
-      *tail_ptr_ = (*tail_ptr_ + 1) % 32;
-    }
-    __syncwarp();
-  }
-
-  __device__ __forceinline__ bool Contains(uint32_t val) {
-    return __any_sync(kFullMask, val == buffer_ptr_[lane_]);
-  }
-
-  __device__ __forceinline__ void Reset() {}
-
- private:
-  uint32_t* buffer_ptr_;
-  uint32_t* tail_ptr_;
-  int32_t lane_;
 };
 
 template<typename Key, typename Elem, typename Idx>
@@ -174,9 +133,7 @@ class CacheSet final {
   __device__ __forceinline__ uint64_t id() const { return id_; }
 
   __device__ __forceinline__ void Reset(uint64_t id, Key* key, Elem* lines, uint32_t* valid_bits,
-                                        int8_t* lfu_queue_buffer_ptr,
-                                        uint32_t* lru_queue_buffer_ptr,
-                                        uint32_t* lru_queue_tail_ptr, int32_t* mutex) {
+                                        int8_t* lfu_queue_buffer_ptr, int32_t* mutex) {
     if (id_ != kInvalidId && lane_ == 0) { *valid_bits_ptr_ = valid_bits_; }
     id_ = id;
     key_ptr_ = key;
@@ -184,13 +141,11 @@ class CacheSet final {
     valid_bits_ptr_ = valid_bits;
     if (id_ != kInvalidId) { valid_bits_ = *valid_bits; }
     lfu_queue_.Reset(lfu_queue_buffer_ptr);
-    mutex_ = mutex_;
-    lru_queue_buffer_ptr_ = lru_queue_buffer_ptr;
-    lru_queue_tail_ptr_ = lru_queue_tail_ptr;
+    mutex_ = mutex;
   }
 
   __device__ __forceinline__ void Reset() {
-    Reset(kInvalidId, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    Reset(kInvalidId, nullptr, nullptr, nullptr, nullptr, nullptr);
   }
 
   __device__ __forceinline__ int32_t LookupWay(Key key, uint64_t hash) {
@@ -198,41 +153,13 @@ class CacheSet final {
     return FirstLane(hit);
   }
 
+  template<bool key_only>
   __device__ __forceinline__ int32_t Lookup(Key key, uint64_t hash, Elem* line) {
     const int32_t way = LookupWay(key, hash);
-    if (way >= 0) { ReadLine(line, way); }
-    return way;
-  }
-
-  __device__ __forceinline__ bool Update(Key key, uint64_t hash, Elem* line, Key* evicted_key) {
-    int32_t recent_way = -1;
-    bool evicted = false;
-    int32_t way = LookupWay(key, hash);
-    if (way >= 0) {
-      WriteLine(line, way);
-      recent_way = way;
-    } else if (valid_bits_ != kFullMask) {
-      const int32_t invalid_way = __ffs(~valid_bits_) - 1;
-      SetWay(invalid_way, key, hash, line);
-      recent_way = invalid_way;
-    } else {
-      const uint32_t tag = hash >> (sizeof(uint64_t) - sizeof(uint32_t));
-      LRUQueue lru_queue(lane_, lru_queue_buffer_ptr_, lru_queue_tail_ptr_);
-      if (lru_queue.Contains(tag)) {
-        int32_t evict_way = lfu_queue_.Front();
-        Key t = key;
-        ReplaceWay(evict_way, &t, hash, line);
-        *evicted_key = t;
-        recent_way = evict_way;
-        evicted = true;
-      } else {
-        lru_queue.Push(tag);
-        evicted = true;
-        *evicted_key = key;
-      }
+    if (!key_only) {
+      if (way >= 0) { ReadLine(line, way); }
     }
-    if (recent_way >= 0) { lfu_queue_.Push(recent_way); }
-    return evicted;
+    return way;
   }
 
   __device__ __forceinline__ void Update(Key key, uint64_t hash, const Elem* line, Idx* n_evicted,
@@ -247,22 +174,13 @@ class CacheSet final {
       SetWay(invalid_way, key, hash, line);
       recent_way = invalid_way;
     } else {
-      const uint32_t tag = hash >> (sizeof(uint64_t) - sizeof(uint32_t));
-      LRUQueue lru_queue(lane_, lru_queue_buffer_ptr_, lru_queue_tail_ptr_);
-      Idx evicted_idx;
+      __shared__ Idx evicted_idx;
       if (lane_ == 0) { evicted_idx = atomicAdd(n_evicted, 1); }
       __syncwarp();
-      if (lru_queue.Contains(tag)) {
-        int32_t evict_way = lfu_queue_.Front();
-        ReplaceWay(evict_way, evicted_keys + evicted_idx, hash,
-                   evicted_lines + evicted_idx * line_size_);
-        recent_way = evict_way;
-      } else {
-        lru_queue.Push(tag);
-        evicted_keys[evicted_idx] = key;
-        Elem* evicted_line = evicted_lines + evicted_idx * line_size_;
-        for (int32_t i = lane_; i < line_size_; i += 32) { evicted_line[i] = line[i]; }
-      }
+      int32_t evict_way = lfu_queue_.Front();
+      EvictWay(evict_way, key, hash, line, evicted_keys + evicted_idx,
+               evicted_lines + evicted_idx * line_size_);
+      recent_way = evict_way;
     }
     if (recent_way >= 0) { lfu_queue_.Push(recent_way); }
   }
@@ -277,11 +195,6 @@ class CacheSet final {
     for (int32_t i = lane_; i < line_size_; i += 32) { line[i] = src[i]; }
   }
 
-  __device__ __forceinline__ void SwapLine(Elem* line, int32_t way) {
-    Elem* target_line = lines_ptr_ + way * line_size_;
-    for (int32_t i = lane_; i < line_size_; i += 32) { SwapElem(target_line[i], line[i]); }
-  }
-
   __device__ __forceinline__ void SetWay(int32_t way, Key key, uint32_t hash, const Elem* line) {
     if (lane_ == 0) { key_ptr_[way] = key; }
     const uint32_t mask = (1U << way);
@@ -289,11 +202,17 @@ class CacheSet final {
     WriteLine(line, way);
   }
 
-  __device__ __forceinline__ void ReplaceWay(int32_t way, Key* key, uint32_t hash, Elem* line) {
-    if (lane_ == 0) { SwapElem(key_ptr_[way], *key); }
-    const uint32_t mask = (1U << way);
-    valid_bits_ |= mask;
-    SwapLine(line, way);
+  __device__ __forceinline__ void EvictWay(int32_t way, Key key, uint32_t hash, const Elem* line,
+                                           Key* evict_key, Elem* evict_line) {
+    if (lane_ == 0) {
+      *evict_key = key_ptr_[way];
+      key_ptr_[way] = key;
+    }
+    Elem* cache_line = lines_ptr_ + way * line_size_;
+    for (int32_t i = lane_; i < line_size_; i += 32) {
+      evict_line[i] = cache_line[i];
+      cache_line[i] = line[i];
+    }
   }
 
  private:
@@ -307,8 +226,6 @@ class CacheSet final {
   uint32_t* valid_bits_ptr_;
   LFUQueue lfu_queue_;
   int32_t* mutex_;
-  uint32_t* lru_queue_buffer_ptr_;
-  uint32_t* lru_queue_tail_ptr_;
 };
 
 template<typename Key, typename Elem, typename Idx>
@@ -316,8 +233,6 @@ struct CacheContext {
   Key* keys;
   Elem* lines;
   uint32_t* valid_bits;
-  uint32_t* lru_queue_buffer;
-  uint32_t* lru_queue_tail;
   int8_t* lfu_queue_buffer;
   int32_t* mutex;
   uint32_t log2_n_set;
@@ -338,9 +253,7 @@ struct CacheContext {
     keys = OffsetPtr<Key>(workspace, 0);
     lines = OffsetPtr<Elem>(keys, KeysSize(n_set));
     valid_bits = OffsetPtr<uint32_t>(lines, LinesSize(n_set, line_size));
-    lru_queue_buffer = OffsetPtr<uint32_t>(valid_bits, ValidBitsSize(n_set));
-    lru_queue_tail = OffsetPtr<uint32_t>(lru_queue_buffer, LRUQueueBufferSize(n_set));
-    lfu_queue_buffer = OffsetPtr<int8_t>(lru_queue_tail, LRUQueueTailSize(n_set));
+    lfu_queue_buffer = OffsetPtr<int8_t>(valid_bits, ValidBitsSize(n_set));
     mutex = OffsetPtr<int32_t>(lfu_queue_buffer, LFUQueueBufferSize(n_set));
   }
 
@@ -348,8 +261,7 @@ struct CacheContext {
                                                                        uint32_t line_size) {
     const uint64_t n_set = 1ULL << log2_n_set;
     return KeysSize(n_set) + LinesSize(n_set, line_size) + ValidBitsSize(n_set)
-           + LRUQueueBufferSize(n_set) + LRUQueueTailSize(n_set) + LFUQueueBufferSize(n_set)
-           + MutexSize(n_set);
+           + LFUQueueBufferSize(n_set) + MutexSize(n_set);
   }
 
   template<typename T>
@@ -370,14 +282,6 @@ struct CacheContext {
     return AlignedSize(n_set * sizeof(uint32_t));
   }
 
-  __device__ __host__ __forceinline__ static uint64_t LRUQueueBufferSize(uint64_t n_set) {
-    return AlignedSize(n_set * kNWay * sizeof(uint32_t));
-  }
-
-  __device__ __host__ __forceinline__ static uint64_t LRUQueueTailSize(uint64_t n_set) {
-    return AlignedSize(n_set * sizeof(uint32_t));
-  }
-
   __device__ __host__ __forceinline__ static uint64_t LFUQueueBufferSize(uint64_t n_set) {
     return AlignedSize(n_set * kNWay * sizeof(int8_t));
   }
@@ -394,8 +298,7 @@ struct CacheContext {
     if (set.id() != set_idx) {
       const uint64_t offset = set_idx * 32;
       set.Reset(set_idx, keys + offset, lines + offset * line_size, valid_bits + set_idx,
-                lfu_queue_buffer + offset, lru_queue_buffer + offset, lru_queue_tail + set_idx,
-                mutex + set_idx);
+                lfu_queue_buffer + offset, mutex + set_idx);
     }
   }
 
@@ -434,17 +337,12 @@ __global__ void InitKernel(CacheContext<Key, Elem, Idx> ctx) {
   }
   for (uint64_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n_set * ctx.kNWay;
        i += gridDim.x * blockDim.x) {
-    ctx.lru_queue_buffer[i] = 0;
-  }
-  *ctx.lru_queue_tail = 0;
-  for (uint64_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n_set * ctx.kNWay;
-       i += gridDim.x * blockDim.x) {
     // LFU
-    ctx.lfu_queue_buffer[i] = 31 - i % ctx.kNWay;
+    ctx.lfu_queue_buffer[i] = i % ctx.kNWay;
   }
 }
 
-template<typename Key, typename Elem, typename Idx, typename Hash>
+template<typename Key, typename Elem, typename Idx, typename Hash, bool key_only>
 __device__ void LookupKernelImpl(CacheContext<Key, Elem, Idx> ctx, uint64_t n_key, const Key* keys,
                                  Elem* lines, Idx* n_miss, Key* miss_keys, Idx* miss_indices) {
   const uint32_t worker_id = blockIdx.x * blockDim.y + threadIdx.y;
@@ -458,28 +356,31 @@ __device__ void LookupKernelImpl(CacheContext<Key, Elem, Idx> ctx, uint64_t n_ke
       const uint64_t hash = Hash()(key);
       const uint64_t set_idx = hash >> (sizeof(uint64_t) * 8 - ctx.log2_n_set);
       ctx.ResetSet(set, set_idx);
-      const int32_t way = set.Lookup(key, hash, lines + (key_id + idx) * ctx.line_size);
+      Elem* line = key_only ? nullptr : lines + (key_id + idx) * ctx.line_size;
+      const int32_t way = set.Lookup<key_only>(key, hash, line);
       ctx.ResetSet(set);
       if (way < 0 && lane == 0) {
         Idx pos = atomicAdd(n_miss, 1);
         miss_keys[pos] = key;
-        miss_indices[pos] = key_id + idx;
+        if (!key_only) { miss_indices[pos] = key_id + idx; }
       }
       __syncwarp();
     }
   }
 }
 
-template<typename Key, typename Elem, typename Idx, typename Hash>
+template<typename Key, typename Elem, typename Idx, typename Hash, bool key_only>
 __global__ void LookupKernel(CacheContext<Key, Elem, Idx> ctx, Idx n_key, const Key* keys,
                              Elem* lines, Idx* n_miss, Key* miss_keys, Idx* miss_indices) {
-  LookupKernelImpl<Key, Elem, Idx, Hash>(ctx, n_key, keys, lines, n_miss, miss_keys, miss_indices);
+  LookupKernelImpl<Key, Elem, Idx, Hash, key_only>(ctx, n_key, keys, lines, n_miss, miss_keys,
+                                                   miss_indices);
 }
 
-template<typename Key, typename Elem, typename Idx, typename Hash>
+template<typename Key, typename Elem, typename Idx, typename Hash, bool key_only>
 __global__ void LookupKernel(CacheContext<Key, Elem, Idx> ctx, const Idx* n_key, const Key* keys,
                              Elem* lines, Idx* n_miss, Key* miss_keys, Idx* miss_indices) {
-  LookupKernelImpl<Key, Elem, Idx, Hash>(ctx, *n_key, keys, lines, n_miss, miss_keys, miss_indices);
+  LookupKernelImpl<Key, Elem, Idx, Hash, key_only>(ctx, *n_key, keys, lines, n_miss, miss_keys,
+                                                   miss_indices);
 }
 
 template<typename Key, typename Elem, typename Idx, typename Hash, int block_size>
