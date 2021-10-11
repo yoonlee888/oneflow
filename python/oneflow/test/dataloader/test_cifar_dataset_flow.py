@@ -40,18 +40,18 @@ def test(test_case, batch_size):
     criterion = nn.CrossEntropyLoss()
     criterion.to(device)
 
-    transform = vision.transforms.Compose(
-        [
-            vision.transforms.ToTensor(),
-        ]
-    )
-
     # transform = vision.transforms.Compose(
     #     [
     #         vision.transforms.ToTensor(),
-    #         vision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     #     ]
     # )
+
+    transform = vision.transforms.Compose(
+        [
+            vision.transforms.ToTensor(),
+            vision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        ]
+    )
 
     train_epoch = 1
     data_dir = os.path.join(
