@@ -131,7 +131,8 @@ void RpcServer::Init() {
   Add([this](CtrlCall<CtrlMethod::kPushKV>* call) {
     const std::string& k = call->request().key();
     const std::string& v = call->request().val();
-    CHECK(kv_.emplace(k, v).second);
+    CHECK(kv_.emplace(k, v).second) << " got duplicate k " << k << " with v " << v;
+    VLOG(1) << "PushKV insert k " << k << " v " << v;
 
     auto pending_kv_calls_it = pending_kv_calls_.find(k);
     if (pending_kv_calls_it != pending_kv_calls_.end()) {
