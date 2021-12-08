@@ -32,6 +32,9 @@ Maybe<bool> IsContiguous(const std::shared_ptr<Tensor>& tensor) {
   if(tensor->is_lazy() || tensor->is_consistent()){
     return true;
   }
+  if(JUST(tensor->storage_offset()) > 0){
+    return false;
+  }
   const Shape& shape = *tensor->shape();
   if(!shape.is_initialized() || shape.NumAxes()<1 || shape.elem_cnt() <= 1 ){
     return true;
