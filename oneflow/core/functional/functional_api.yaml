@@ -1837,3 +1837,7 @@
 - name: "dot"
   signature: "Tensor (Tensor input, Tensor other) => Dot"
   bind_python: True
+
+- name: "cumsum"
+  signature: "Tensor (Tensor input, Int64 dim) => Cumsum"
+  bind_python: True
