@@ -152,6 +152,7 @@ oneflow
             decode_onerec,
             read_onerec,
             from_numpy,
+            cumsum,
 
 .. autofunction:: oneflow.relu
 .. autofunction:: oneflow.env.get_rank
