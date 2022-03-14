@@ -45,6 +45,7 @@ class ReluFunctor {
       JUST(OpInterpUtil::Dispatch(*op_, {x}, outputs.get(), AttrMap{}));
       return outputs->at(0);
     } else {
+      // 将OpExpr，输入Tensor和其它参数（ReLU这个算子没有除输入外的参数）分发出去，还没有真正的执行。
       return OpInterpUtil::Dispatch<Tensor>(*op_, {x});
     }
   }

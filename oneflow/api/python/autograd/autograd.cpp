@@ -51,10 +51,12 @@ Maybe<one::TensorTuple> CheckAndInitOutGrads(const one::TensorTuple& outputs,
     CHECK_OR_RETURN(outputs.at(i)->requires_grad())
         << "All output tensors `.requires_grad` should be true";
     if (out_grads.empty()) {
+      LOG(WARNING) << "+++++ out grad is empty";
       CHECK_OR_RETURN(IsScalarTensor(*outputs.at(i)))
           << "Grad can be implicitly created only for scalar outputs";
       gradients->at(i) = JUST(one::functional::OnesLike(outputs.at(i)));
     } else {
+      LOG(WARNING) << "+++++ out grad is not empty";
       CHECK_OR_RETURN(*(outputs.at(i)->shape()) == *(out_grads.at(i)->shape()))
           << "out_grad's shape must be same as output's (" << outputs.at(i)->shape()->ToString()
           << " vs " << out_grads.at(i)->shape()->ToString() << ")";

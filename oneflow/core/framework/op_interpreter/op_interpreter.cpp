@@ -96,6 +96,9 @@ Maybe<void> AutogradInterpreter::Apply(const OpExpr& op_expr, const TensorTuple&
   }
   if (requires_grad) {
     const auto& grad_closure = JUST(op_expr.GetOrCreateOpGradClosure());
+    LOG(WARNING) << op_expr.op_type_name() << " inputs size: " << inputs.size() << " output size: " << outputs->size();
+    
+    // 上方打印出来的input address 和下面的catpure里面的input address不一致、、、、
     JUST(grad_closure->Capture(inputs, *outputs, ctx));
 
     auto backward_fn =

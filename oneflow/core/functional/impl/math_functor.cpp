@@ -238,6 +238,7 @@ class ScalarPowGradFunctor {
     } else {
       UNIMPLEMENTED_THEN_RETURN() << "The scalar in ScalarPowGrad should be float or int.";
     }
+    LOG(WARNING) << "ScalarPowGradFunctor..";
     return OpInterpUtil::Dispatch<Tensor>(*op_, {x, dy}, attrs);
   }
 

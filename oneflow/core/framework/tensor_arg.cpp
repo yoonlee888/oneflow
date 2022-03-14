@@ -25,6 +25,7 @@ bool TensorArg::Empty() const { return !acc_tensor_; }
 
 void TensorArg::Release() { acc_tensor_.reset(); }
 
+// 把partial tensor加到acc tensor里
 Maybe<void> TensorArg::PushPartialTensor(const std::shared_ptr<Tensor>& partial_tensor) {
   if (!acc_tensor_) {
     acc_tensor_ = partial_tensor;

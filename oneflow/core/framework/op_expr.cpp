@@ -133,6 +133,7 @@ Maybe<bool> BuiltinOpExprImpl<UserOpConf>::IsGradDisabled() const {
 
 template<>
 Maybe<OpExprGradClosure> BuiltinOpExprImpl<UserOpConf>::GetOrCreateOpGradClosure() const {
+  LOG(WARNING) << "trying to GetOrCreateOpGradClosure: " << proto().op_type_name();
   if (!op_grad_func_.get()) {
     CHECK_OR_RETURN((IsClassRegistered<std::string, OpExprGradFunctionIf>(proto().op_type_name())))
         << "The gradient function for op " << proto().op_type_name()

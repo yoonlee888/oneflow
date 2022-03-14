@@ -39,6 +39,7 @@ class FunctionNode {
   Maybe<bool> Apply(bool create_graph);
   Maybe<void> AccGrad4LeafTensor(bool create_graph);
   Maybe<void> AccGrad4RetainGradTensor();
+  Maybe<void> ClearOutputMetadataAccGrad();
   void ReleaseOutTensorArgs();
   // Releases the eventual c++ std::function for backward if retain_graph=False to avoid calling
   // `Apply` in second time
@@ -175,6 +176,7 @@ class GraphTask final {
  private:
   bool retain_graph_;
   bool create_graph_;
+  // 储存outputs对应的反向节点
   std::vector<FunctionNode*> roots_;
   HashMap<FunctionNode*, int> dependencies_;
   HashSet<FunctionNode*> need_execute_;

@@ -16,6 +16,7 @@ limitations under the License.
 
 #include <stack>
 #include <queue>
+#include <iostream>
 #include "oneflow/core/autograd/autograd_engine.h"
 #include "oneflow/core/autograd/autograd_meta.h"
 #include "oneflow/core/framework/tensor.h"
@@ -142,6 +143,15 @@ Maybe<void> FunctionNode::AccGrad4LeafTensor(bool create_graph) {
   for (const std::shared_ptr<AutogradMeta>& out : output_meta_data_) {
     if (out->is_leaf() && out->requires_grad()) {
       JUST(CopyOrAccGrad(out.get(), /*autograd_mode=*/false));
+    }
+  }
+  return Maybe<void>::Ok();
+}
+
+Maybe<void> FunctionNode::ClearOutputMetadataAccGrad() {
+  for (const std::shared_ptr<AutogradMeta>& out : output_meta_data_) {
+    if (out->is_leaf() and out->acc_grad()) {
+      JUST(out->set_acc_grad(nullptr));
     }
   }
   return Maybe<void>::Ok();
@@ -293,6 +303,14 @@ GraphFunctionNode::GraphFunctionNode(
         backward_fn,
     const TensorTuple& inputs, const TensorTuple& outputs)
     : FunctionNode(op_type_name) {
+  LOG(WARNING) << "==========init node name: " << op_type_name << " input size: " << inputs.size() << " output size: " << outputs.size();
+  for (const auto& in : inputs) {
+    if (in->requires_grad()) {
+      LOG(WARNING) << in;
+      auto before_node = in->grad_fn_node();
+      LOG(WARNING) << "==========address of input function node: " << before_node->GetOpTypeName() << " node address: " << before_node;
+    }
+  }
   input_meta_data_.resize(inputs.size());
   next_functions_->reserve(inputs.size());
   for (int i = 0; i < inputs.size(); ++i) {
@@ -326,6 +344,7 @@ GraphTask::GraphTask(const TensorTuple& outputs, bool retain_graph, bool create_
 }
 
 // Computes the number of dependencies for each FunctionNode
+// 计算每个节点的输出边个数
 Maybe<void> GraphTask::ComputeDependencies() {
   HashSet<FunctionNode*> seen;
   std::stack<FunctionNode*> stack;
@@ -398,6 +417,7 @@ Maybe<void> GraphTask::ComputeDependenciesAndPruneNode(const TensorTuple& inputs
   return Maybe<void>::Ok();
 }
 
+// 根据dependencies_, 顺序依次执行节点
 Maybe<void> GraphTask::Apply(bool save_grad_for_leaf) {
   std::queue<FunctionNode*> queue;
   for (FunctionNode* node : roots_) {
@@ -411,6 +431,8 @@ Maybe<void> GraphTask::Apply(bool save_grad_for_leaf) {
       node->ReleaseOutTensorArgs();
       continue;
     }
+    // LOG(WARNING) << "execute node name: " << node->GetOpTypeName();
+    // JUST(node->ClearOutputMetadataAccGrad());
     if (/*bool not_ready_to_apply=*/!(JUST(node->Apply(create_graph_)))) { continue; }
     if (save_grad_for_leaf) { JUST(node->AccGrad4LeafTensor(create_graph_)); }
     JUST(node->AccGrad4RetainGradTensor());

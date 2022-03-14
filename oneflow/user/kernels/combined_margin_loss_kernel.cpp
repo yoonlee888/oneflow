@@ -96,7 +96,7 @@ class CombinedMarginLossCpuKernel final : public user_op::OpKernel {
       K label = label_ptr[row_id] - lower_bound;
       if (label == col_id) {
         const T theta_data = AcosFunctor<T>::Forward(in_data);
-        out_data = CosFunctor<T>::Forward(theta_data * static_cast<T>(m1) + static_cast<T>(m2))
+        out_data = MATH_FUNC_F(cos, theta_data * static_cast<T>(m1) + static_cast<T>(m2))
                    - static_cast<T>(m3);
         theta_ptr[row_id] = theta_data;
       } else if ((label < 0 || label >= num_classes) && col_id == 0) {
@@ -158,8 +158,8 @@ class CombinedMarginLossGradCpuKernel final : public user_op::OpKernel {
       T dx_data = dy_data;
       if (label == col_id) {
         dx_data = dy_data
-                  * SinFunctor<T>::Forward(theta_data * static_cast<T>(m1) + static_cast<T>(m2))
-                  * static_cast<T>(m1) / SinFunctor<T>::Forward(theta_data);
+                  * MATH_FUNC_F(sin, theta_data * static_cast<T>(m1) + static_cast<T>(m2))
+                  * static_cast<T>(m1) / MATH_FUNC_F(sin, theta_data);
       }
       dx_ptr[i] = dx_data;
     }

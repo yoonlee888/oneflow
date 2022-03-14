@@ -158,8 +158,9 @@ Maybe<void> NaiveInterpret(const UserOpExpr& user_op_expr, const TensorTuple& in
   for (int64_t index : kernel->output_tuple_indexes4mut2_obns()) {
     output_eager_blob_objects->at(index)->set_is_shape_synced(false);
   }
-
+  // PhysicalRun负责给虚拟机发送这个指令并执行获得最终结果。
   JUST(PhysicalRun([&](InstructionsBuilder* builder) -> Maybe<void> {
+    // 构建虚拟机（VM）的指令
     return builder->LocalCallOpKernel(kernel, input_eager_blob_objects, output_eager_blob_objects,
                                       ctx, op_device);
   }));

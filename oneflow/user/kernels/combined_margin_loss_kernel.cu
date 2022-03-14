@@ -38,7 +38,7 @@ __global__ void GpuForward(const int64_t n, const int64_t num_classes, const int
     } else {
       if (label == col_id) {
         const T theta_data = AcosFunctor<T>::Forward(in_data);
-        out_data = CosFunctor<T>::Forward(theta_data * m1 + m2) - m3;
+        out_data = MATH_FUNC_F(cos, theta_data * m1 + m2) - m3;
         theta[row_id] = theta_data;
       } else if ((label < 0 || label >= num_classes) && col_id == 0) {
         theta[row_id] = 0;
@@ -60,8 +60,8 @@ __global__ void GpuBackward(const int64_t n, const int64_t num_classes, const in
     const T theta_data = theta[row_id];
     T dx_data = dy_data;
     if (label == col_id && !is_cosine_loss) {
-      dx_data = dy_data * SinFunctor<T>::Forward(theta_data * m1 + m2) * m1
-                / SinFunctor<T>::Forward(theta_data);
+      dx_data = dy_data * MATH_FUNC_F(sin, theta_data * m1 + m2) * m1
+                / MATH_FUNC_F(sin, theta_data);
     }
     dx[i] = dx_data;
   }
